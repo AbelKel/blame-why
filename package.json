@@ -1,0 +1,44 @@
+{
+  "name": "blame-why",
+  "version": "1.0.0",
+  "description": "Enrich git blame with PR context — instantly understand why a line of code changed",
+  "main": "dist/index.js",
+  "bin": {
+    "blame-why": "dist/index.js"
+  },
+  "type": "commonjs",
+  "scripts": {
+    "build": "tsc",
+    "postbuild": "chmod +x dist/index.js",
+    "dev": "ts-node --esm src/index.ts",
+    "lint": "tsc --noEmit",
+    "prepare": "npm run build",
+    "link": "npm run build && npm link"
+  },
+  "keywords": [
+    "git",
+    "blame",
+    "github",
+    "pull-request",
+    "cli",
+    "developer-tools",
+    "dx"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ]
+}
