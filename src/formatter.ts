@@ -2,21 +2,18 @@
  * Output formatting module.
  *
  * Responsible for all terminal rendering. Nothing outside this file should
- * call console.log directly — centralizing output here makes it easy to
- * add alternative output formats (JSON, markdown) in the future.
+ * call console.log directly
  */
 
 import chalk from "chalk";
 import type { BlameWhyResult, BlameInfo, PullRequest, Issue, ReviewComment } from "./types.js";
 
-// ─── Layout constants ─────────────────────────────────────────────────────────
 
 const WIDTH = 72;
 const HEAVY_RULE = chalk.dim("─".repeat(WIDTH));
 const LIGHT_RULE = chalk.dim("·".repeat(WIDTH));
 const INDENT = "  ";
 
-// ─── Public API ──────────────────────────────────────────────────────────────
 
 /**
  * Renders the complete blame-why result to stdout.
@@ -26,30 +23,29 @@ export function printResult(result: BlameWhyResult): void {
   console.log();
   printBlameSection(result.blame);
 
-  // ── No GitHub remote ──────────────────────────────────────────────────────
   if (!result.remote) {
     console.log();
     console.log(
       chalk.yellow(
-        `${INDENT}⚠  No GitHub remote detected — showing git blame info only.`
+        `${INDENT} No GitHub remote detected! showing git blame info only.`
       )
     );
     console.log();
     return;
   }
 
-  // ── Warning (non-fatal GitHub error) ─────────────────────────────────────
+  // Warning (non-fatal GitHub error) 
   if (result.warning) {
     console.log();
     console.log(chalk.yellow(`${INDENT}⚠  ${result.warning}`));
   }
 
-  // ── No linked PR ─────────────────────────────────────────────────────────
+  //No linked PR
   if (!result.pullRequest) {
     console.log();
     console.log(
       chalk.dim(
-        `${INDENT}ℹ  No pull request found for commit ${result.blame.shortHash}.`
+        `${INDENT} No pull request found for commit ${result.blame.shortHash}.`
       )
     );
     console.log(
@@ -61,7 +57,7 @@ export function printResult(result: BlameWhyResult): void {
     return;
   }
 
-  // ── PR + optional sections ────────────────────────────────────────────────
+  // PR + optional sections
   console.log();
   printPullRequestSection(result.pullRequest);
 
@@ -78,16 +74,16 @@ export function printResult(result: BlameWhyResult): void {
   console.log();
 }
 
-/** Prints a red error message to stderr. */
+/** Prints error message to stderr. */
 export function printError(message: string): void {
   process.stderr.write(
-    chalk.red.bold(`\n  ✗ Error: `) + chalk.red(message) + "\n\n"
+    chalk.red.bold(`\n Error: `) + chalk.red(message) + "\n\n"
   );
 }
 
 /** Prints a yellow warning to stderr. */
 export function printWarning(message: string): void {
-  process.stderr.write(chalk.yellow(`  ⚠ Warning: `) + message + "\n");
+  process.stderr.write(chalk.yellow(`  Warning: `) + message + "\n");
 }
 
 // ─── Sections ─────────────────────────────────────────────────────────────────

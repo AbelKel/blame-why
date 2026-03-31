@@ -68,7 +68,7 @@ npm install -g blame-why
 ### From source
 
 ```bash
-git clone https://github.com/your-username/blame-why.git
+git clone https://github.com/AbelKel/blame-why.git
 cd blame-why
 npm install
 npm run build
@@ -178,7 +178,7 @@ Each module has a single responsibility and is independently testable. The forma
 ## Contributing
 
 ```bash
-git clone https://github.com/your-username/blame-why.git
+git clone https://github.com/AbelKel/blame-why.git
 cd blame-why
 npm install
 npm run lint   # type-check only, no emit
