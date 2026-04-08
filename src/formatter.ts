@@ -89,22 +89,28 @@ export function printWarning(message: string): void {
 // ─── Sections ─────────────────────────────────────────────────────────────────
 
 function printBlameSection(blame: BlameInfo): void {
+  const isFileLevel = blame.lineNumber === 0;
+
   // ── Header ────────────────────────────────────────────────────────────────
   console.log(HEAVY_RULE);
   console.log(
     `${INDENT}${chalk.bold.cyan("blame-why")}` +
-      chalk.dim(`  ${blame.filename}:${blame.lineNumber}`)
+      chalk.dim(isFileLevel
+        ? `  ${blame.filename}  (last change)`
+        : `  ${blame.filename}:${blame.lineNumber}`)
   );
   console.log(HEAVY_RULE);
   console.log();
 
-  // ── Source line ───────────────────────────────────────────────────────────
-  const lineLabel = chalk.dim(`L${blame.lineNumber} `);
-  const lineContent = blame.isUncommitted
-    ? chalk.italic.dim(blame.lineContent || "(empty)")
-    : chalk.white(blame.lineContent || "(empty)");
-  console.log(`${INDENT}${lineLabel}${lineContent}`);
-  console.log();
+  // ── Source line (skip for file-level view) ────────────────────────────────
+  if (!isFileLevel) {
+    const lineLabel = chalk.dim(`L${blame.lineNumber} `);
+    const lineContent = blame.isUncommitted
+      ? chalk.italic.dim(blame.lineContent || "(empty)")
+      : chalk.white(blame.lineContent || "(empty)");
+    console.log(`${INDENT}${lineLabel}${lineContent}`);
+    console.log();
+  }
 
   // ── Commit metadata ───────────────────────────────────────────────────────
   if (blame.isUncommitted) {

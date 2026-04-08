@@ -82,6 +82,85 @@ export function getGitRemote(remoteName = "origin"): GitRemote | null {
   return parseRemoteUrl(rawUrl);
 }
 
+/**
+ * Returns structured info about the most recent commit that touched a file.
+ * Uses `git log -1` instead of `git blame`.
+ *
+ * @param filePath  Absolute or repo-relative path to the file.
+ * @throws If the file is not tracked or we're not inside a git repo.
+ */
+export function getLastCommitForFile(filePath: string): BlameInfo {
+  let output: string;
+  try {
+    // %H  = full hash
+    // %an = author name
+    // %ae = author email
+    // %at = author timestamp (unix)
+    // %ai = author date ISO (contains timezone at end, e.g. "2026-03-26 21:59:25 -0700")
+    // %cn = committer name
+    // %ce = committer email
+    // %ct = committer timestamp (unix)
+    // %s  = subject
+    // Using %x00 (null byte) as delimiter for safe parsing.
+    output = execSync(
+      `git log -1 --format="%H%x00%an%x00%ae%x00%at%x00%ai%x00%cn%x00%ce%x00%ct%x00%s" -- "${filePath}"`,
+      { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }
+    );
+  } catch (err) {
+    throw translateGitError(err, filePath);
+  }
+
+  const trimmed = output.trim();
+  if (!trimmed) {
+    throw new Error(
+      `No git history found for ${filePath}. ` +
+        "Is the file tracked by git?"
+    );
+  }
+
+  const parts = trimmed.split("\0");
+  if (parts.length < 9) {
+    throw new Error(`Unexpected git log output format for ${filePath}.`);
+  }
+
+  const commitHash = parts[0]!;
+  const isUncommitted = commitHash === "0".repeat(40);
+
+  // %ai gives "2026-03-26 21:59:25 -0700" — extract the timezone suffix.
+  const authorDateIso = parts[4]!;
+  const tzMatch = authorDateIso.match(/([+-]\d{4})$/);
+  const authorTimezone = tzMatch ? tzMatch[1]! : "";
+
+  // Extract just the filename relative to the repo root.
+  let filename: string;
+  try {
+    filename = execSync(
+      `git ls-files --full-name -- "${filePath}"`,
+      { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }
+    ).trim();
+  } catch {
+    filename = filePath;
+  }
+
+  return {
+    commitHash,
+    shortHash: commitHash.substring(0, 8),
+    author: parts[1]!,
+    authorEmail: parts[2]!,
+    authorTime: new Date(parseInt(parts[3]!, 10) * 1000),
+    authorTimezone,
+    committer: parts[5]!,
+    committerEmail: parts[6]!,
+    committerTime: new Date(parseInt(parts[7]!, 10) * 1000),
+    summary: parts[8]!,
+    filename: filename || filePath,
+    lineContent: "",
+    lineNumber: 0,
+    isBoundary: false,
+    isUncommitted,
+  };
+}
+
 // ─── Porcelain parser ─────────────────────────────────────────────────────────
 
 /**

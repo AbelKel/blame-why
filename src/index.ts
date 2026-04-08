@@ -10,7 +10,7 @@
 
 import { program } from "commander";
 import path from "path";
-import { getBlameForLine, getGitRemote } from "./git.js";
+import { getBlameForLine, getLastCommitForFile, getGitRemote } from "./git.js";
 import { getPullRequestsForCommit, getReviewComments, GitHubApiError } from "./github.js";
 import { printResult, printError, printWarning } from "./formatter.js";
 import type { BlameWhyResult, Config } from "./types.js";
@@ -25,7 +25,7 @@ program
   )
   .version("1.0.0", "-v, --version")
   .argument("<file>", "Path to the source file (relative to cwd or absolute)")
-  .argument("<line>", "Line number to inspect (1-based)")
+  .argument("[line]", "Line number to inspect (1-based). If omitted, shows the last change to the file.")
   .option(
     "-r, --remote <name>",
     "Git remote name to resolve as GitHub origin",
@@ -49,6 +49,7 @@ program
     `
 Examples:
   $ blame-why src/auth.ts 42
+  $ blame-why src/auth.ts              (shows last change to file)
   $ blame-why lib/parser.js 108 --no-comments
   $ blame-why src/index.ts 7 --remote upstream
 
@@ -83,11 +84,14 @@ if (!rawFileArg) {
   process.exit(0);
 }
 
-// Validate line number eagerly so we fail fast with a clear message.
-const lineNumber = parseInt(rawLineArg ?? "", 10);
-if (!rawLineArg || isNaN(lineNumber) || lineNumber < 1) {
-  printError("Line number must be a positive integer (e.g. 42).");
-  process.exit(1);
+// Validate line number when provided.
+let lineNumber: number | null = null;
+if (rawLineArg) {
+  lineNumber = parseInt(rawLineArg, 10);
+  if (isNaN(lineNumber) || lineNumber < 1) {
+    printError("Line number must be a positive integer (e.g. 42).");
+    process.exit(1);
+  }
 }
 
 const fileArg: string = rawFileArg;
@@ -102,7 +106,7 @@ main(fileArg, lineNumber, options).catch((err: unknown) => {
 
 async function main(
   fileArg: string,
-  lineNumber: number,
+  lineNumber: number | null,
   options: CliOptions
 ): Promise<void> {
   // Build runtime config from env + CLI options.
@@ -123,8 +127,10 @@ async function main(
   // Resolve file path against cwd so relative paths work from any directory.
   const absolutePath = path.resolve(process.cwd(), fileArg);
 
-  // ── Step 1: git blame ─────────────────────────────────────────────────────
-  const blame = getBlameForLine(absolutePath, lineNumber);
+  // ── Step 1: git blame or last commit ──────────────────────────────────────
+  const blame = lineNumber
+    ? getBlameForLine(absolutePath, lineNumber)
+    : getLastCommitForFile(absolutePath);
 
   // ── Step 2: GitHub remote ─────────────────────────────────────────────────
   const remote = getGitRemote(options.remote);
