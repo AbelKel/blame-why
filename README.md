@@ -53,6 +53,8 @@ $ blame-why src/auth.ts 42
 - **PR context** — Title, description, author, and merge date at a glance
 - **Linked issues** — Automatically parsed from `Closes #123` / `Fixes #456` keywords in the PR body
 - **Review comments** — The inline discussion that shaped the code
+- **Interactive file log** — Browse all changes to a file with `blame-why log`, scrolling through commits with linked PRs
+- **Branch support** — View history for any branch with `--branch`
 - **Graceful fallback** — Works without `GITHUB_TOKEN`, and degrades cleanly when no PR exists
 - **JSON output** — `--json` flag for scripting and editor integrations
 - **GitHub Enterprise** — Override the API base URL via `GITHUB_API_BASE`
@@ -90,7 +92,8 @@ You can create a token at **GitHub → Settings → Developer settings → Perso
 ## Usage
 
 ```
-blame-why <file> <line> [options]
+blame-why <file> [line] [options]
+blame-why log <file> [options]
 ```
 
 ### Arguments
@@ -98,7 +101,7 @@ blame-why <file> <line> [options]
 | Argument | Description |
 |----------|-------------|
 | `file`   | Path to the source file (relative to cwd or absolute) |
-| `line`   | 1-based line number to inspect |
+| `line`   | 1-based line number to inspect (if omitted, shows the last change to the file) |
 
 ### Options
 
@@ -110,6 +113,23 @@ blame-why <file> <line> [options]
 | `--json` | Output raw JSON instead of formatted text | — |
 | `-v, --version` | Print version | — |
 | `-h, --help` | Show help | — |
+
+### `log` subcommand
+
+Browse all changes to a file interactively, with linked PR info for each commit.
+
+```
+blame-why log <file> [options]
+```
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `-r, --remote <name>` | Git remote name to resolve as GitHub origin | `origin` |
+| `-b, --branch <name>` | Branch or ref to show history for | current HEAD |
+| `--max <n>` | Maximum number of commits to load | `200` |
+| `--json` | Output raw JSON instead of the interactive viewer | — |
+
+**Navigation:** `↑`/`k` previous · `↓`/`j` next · `g` first · `G` last · `q` quit
 
 ### Environment variables
 
@@ -135,9 +155,23 @@ blame-why src/routes.ts 55 --json | jq '.pullRequest.title'
 
 # GitHub Enterprise
 GITHUB_API_BASE=https://github.myco.com/api/v3 blame-why src/app.ts 12
+
+# Browse all changes to a file interactively
+blame-why log src/auth.ts
+
+# Browse changes on a specific branch
+blame-why log src/auth.ts --branch main
+
+# Browse changes on a different remote
+blame-why log src/auth.ts --branch main --remote upstream
+
+# Export file change history as JSON
+blame-why log src/routes.ts --json --max 50
 ```
 
 ## How it works
+
+### Single-line blame
 
 1. **`git blame --porcelain`** is run for the specified file and line, giving the commit SHA, author, date, and commit message
 2. The git **remote URL** is parsed to extract the GitHub owner and repo
@@ -146,14 +180,22 @@ GITHUB_API_BASE=https://github.myco.com/api/v3 blame-why src/app.ts 12
 5. **Review comments** for the PR are fetched and filtered to the most recent `--max-comments`
 6. Everything is rendered with colour via [chalk](https://github.com/chalk/chalk)
 
+### File log (`blame-why log`)
+
+1. **`git log`** is run for the file (optionally filtered to a branch) to collect all commits
+2. An **interactive full-screen viewer** renders one commit at a time
+3. **PR info is fetched lazily** — only when you navigate to a commit, keeping API usage low
+4. Each entry shows the commit metadata and a **clickable link to the PR** that introduced the change
+
 ## Architecture
 
 ```
 src/
 ├── index.ts       CLI entry point — argument parsing and orchestration
-├── git.ts         Git operations (blame, remote URL parsing)
+├── git.ts         Git operations (blame, log, remote URL parsing)
 ├── github.ts      GitHub REST API calls and response mapping
 ├── formatter.ts   All terminal output — chalk colours, layout, truncation
+├── viewer.ts      Interactive full-screen viewer for file log browsing
 └── types.ts       TypeScript interfaces shared across modules
 ```
 
