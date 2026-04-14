@@ -1,6 +1,6 @@
 {
   "name": "blame-why",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Enrich git blame with PR context — instantly understand why a line of code changed",
   "main": "dist/index.js",
   "bin": {
