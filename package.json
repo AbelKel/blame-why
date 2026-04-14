@@ -38,7 +38,6 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "blame-why": "^1.0.0",
     "chalk": "^4.1.2",
     "commander": "^11.1.0"
   },
