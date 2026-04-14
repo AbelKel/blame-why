@@ -90,6 +90,16 @@ export interface BlameWhyResult {
   warning?: string;
 }
 
+// ─── File log ────────────────────────────────────────────────────────────────
+
+/** A single entry in the file change log with optional PR enrichment. */
+export interface FileLogEntry {
+  blame: BlameInfo;
+  pullRequest: PullRequest | null;
+  /** Whether we've already attempted to fetch PR info for this entry. */
+  prFetched: boolean;
+}
+
 // ─── Runtime config ──────────────────────────────────────────────────────────
 
 export interface Config {

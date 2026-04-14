@@ -161,6 +161,90 @@ export function getLastCommitForFile(filePath: string): BlameInfo {
   };
 }
 
+/**
+ * Returns all commits that touched a file, ordered newest-first.
+ *
+ * @param filePath  Absolute or repo-relative path to the file.
+ * @param maxCommits  Maximum number of commits to return.
+ * @param branch  Optional branch/ref to restrict the log to.
+ *                When omitted the current HEAD is used.
+ * @throws If the file is not tracked or we're not inside a git repo.
+ */
+export function getFileLog(
+  filePath: string,
+  maxCommits: number = 200,
+  branch?: string
+): BlameInfo[] {
+  let output: string;
+  const branchArg = branch ? `${branch} ` : "";
+  try {
+    output = execSync(
+      `git log -${maxCommits} ${branchArg}--format="%H%x00%an%x00%ae%x00%at%x00%ai%x00%cn%x00%ce%x00%ct%x00%s%x00" -- "${filePath}"`,
+      { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }
+    );
+  } catch (err) {
+    throw translateGitError(err, filePath);
+  }
+
+  const trimmed = output.trim();
+  if (!trimmed) {
+    throw new Error(
+      `No git history found for ${filePath}. ` +
+        "Is the file tracked by git?"
+    );
+  }
+
+  // Extract relative filename once for all entries.
+  let filename: string;
+  try {
+    filename = execSync(
+      `git ls-files --full-name -- "${filePath}"`,
+      { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }
+    ).trim();
+  } catch {
+    filename = filePath;
+  }
+
+  const results: BlameInfo[] = [];
+  // Each record ends with %x00 then newline from --format; split on newlines.
+  const records = trimmed.split("\n");
+
+  for (const record of records) {
+    if (!record.trim()) continue;
+    // Strip trailing null byte if present.
+    const cleaned = record.replace(/\0$/, "");
+    const parts = cleaned.split("\0");
+    if (parts.length < 9) continue;
+
+    const commitHash = parts[0]!;
+    const isUncommitted = commitHash === "0".repeat(40);
+
+    const authorDateIso = parts[4]!;
+    const tzMatch = authorDateIso.match(/([+-]\d{4})$/);
+    const authorTimezone = tzMatch ? tzMatch[1]! : "";
+
+    results.push({
+      commitHash,
+      shortHash: commitHash.substring(0, 8),
+      author: parts[1]!,
+      authorEmail: parts[2]!,
+      authorTime: new Date(parseInt(parts[3]!, 10) * 1000),
+      authorTimezone,
+      committer: parts[5]!,
+      committerEmail: parts[6]!,
+      committerTime: new Date(parseInt(parts[7]!, 10) * 1000),
+      summary: parts[8]!,
+      filename: filename || filePath,
+      lineContent: "",
+      lineNumber: 0,
+      isBoundary: false,
+      isUncommitted,
+    });
+  }
+
+  return results;
+}
+
 // ─── Porcelain parser ─────────────────────────────────────────────────────────
 
 /**

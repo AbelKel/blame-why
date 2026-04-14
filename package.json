@@ -9,7 +9,7 @@
   "type": "commonjs",
   "scripts": {
     "build": "tsc",
-    "postbuild": "chmod +x dist/index.js",
+    "postbuild": "node -e \"require('fs').chmodSync('dist/index.js',0o755)\" 2>nul || true",
     "dev": "ts-node --esm src/index.ts",
     "lint": "tsc --noEmit",
     "prepare": "npm run build",

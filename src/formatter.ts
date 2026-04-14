@@ -6,7 +6,7 @@
  */
 
 import chalk from "chalk";
-import type { BlameWhyResult, BlameInfo, PullRequest, Issue, ReviewComment } from "./types.js";
+import type { BlameWhyResult, BlameInfo, PullRequest, Issue, ReviewComment, FileLogEntry, GitRemote } from "./types.js";
 
 
 const WIDTH = 72;
@@ -282,4 +282,115 @@ function formatDate(date: Date): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+// ─── File log formatting (used by the interactive viewer) ─────────────────────
+
+/**
+ * Renders a single file-log entry to an array of styled lines.
+ * The viewer calls this to paint the screen for each entry.
+ */
+export function formatLogEntry(
+  entry: FileLogEntry,
+  index: number,
+  total: number,
+  filename: string,
+  remote: GitRemote | null
+): string[] {
+  const lines: string[] = [];
+
+  lines.push(HEAVY_RULE);
+  lines.push(
+    `${INDENT}${chalk.bold.cyan("blame-why log")}` +
+      chalk.dim(`  ${filename}`) +
+      chalk.white(`  [${index + 1} / ${total}]`)
+  );
+  lines.push(HEAVY_RULE);
+  lines.push("");
+
+  const { blame, pullRequest, prFetched } = entry;
+
+  // ── Commit metadata ─────────────────────────────────────────────────────
+  if (blame.isUncommitted) {
+    lines.push(
+      `${INDENT}${label("Commit")}${chalk.yellow("(not yet committed)")}`
+    );
+  } else {
+    lines.push(
+      `${INDENT}${label("Commit")}` +
+        chalk.yellow(blame.shortHash) +
+        chalk.dim(`  ${blame.commitHash}`)
+    );
+    lines.push(
+      `${INDENT}${label("Summary")}${chalk.white(blame.summary)}`
+    );
+  }
+
+  lines.push(
+    `${INDENT}${label("Author ")}` +
+      chalk.green(blame.author) +
+      chalk.dim(`  <${blame.authorEmail}>`)
+  );
+  lines.push(
+    `${INDENT}${label("Date   ")}` +
+      chalk.white(formatDate(blame.authorTime)) +
+      chalk.dim(`  (${blame.authorTimezone})`)
+  );
+
+  // ── Pull request ────────────────────────────────────────────────────────
+  lines.push("");
+
+  if (!prFetched) {
+    lines.push(
+      `${INDENT}${chalk.dim("⏳ Fetching PR info…")}`
+    );
+  } else if (pullRequest) {
+    const stateTag =
+      pullRequest.mergedAt
+        ? chalk.magenta("[merged]")
+        : pullRequest.state === "open"
+          ? chalk.green("[open]")
+          : chalk.red("[closed]");
+
+    lines.push(LIGHT_RULE);
+    lines.push(
+      `${INDENT}${chalk.bold.blue(`PR #${pullRequest.number}`)}  ` +
+        chalk.bold.white(pullRequest.title) +
+        `  ${stateTag}`
+    );
+
+    const byLine =
+      chalk.dim(`  by @${pullRequest.author}`) +
+      (pullRequest.mergedAt
+        ? chalk.dim(`  ·  merged ${formatDate(new Date(pullRequest.mergedAt))}`)
+        : chalk.dim(`  ·  opened ${formatDate(new Date(pullRequest.createdAt))}`));
+    lines.push(`${INDENT}${byLine}`);
+    lines.push(`${INDENT}${chalk.cyan.underline(pullRequest.htmlUrl)}`);
+
+    if (pullRequest.labels.length > 0) {
+      const tags = pullRequest.labels
+        .map((l) => chalk.bgBlackBright.white(` ${l} `))
+        .join(" ");
+      lines.push(`${INDENT}${tags}`);
+    }
+  } else if (remote) {
+    lines.push(
+      `${INDENT}${chalk.dim("No pull request found for this commit.")}`
+    );
+  } else {
+    lines.push(
+      `${INDENT}${chalk.yellow("No GitHub remote detected.")}`
+    );
+  }
+
+  // ── Footer ──────────────────────────────────────────────────────────────
+  lines.push("");
+  lines.push(HEAVY_RULE);
+  lines.push(
+    `${INDENT}${chalk.dim("↑/k")} ${chalk.dim("Previous")}` +
+      `${INDENT}${chalk.dim("↓/j")} ${chalk.dim("Next")}` +
+      `${INDENT}${chalk.dim("q")} ${chalk.dim("Quit")}`
+  );
+
+  return lines;
 }
